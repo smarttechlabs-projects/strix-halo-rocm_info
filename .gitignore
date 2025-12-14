@@ -1,5 +1,6 @@
 # Binaries
 rocm_monitor/rocm_monitor
+rocm_monitor/rocm-monitor
 
 # Logs
 *.log
