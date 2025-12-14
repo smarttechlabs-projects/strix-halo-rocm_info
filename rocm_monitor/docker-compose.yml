@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  rocm-monitor:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount rocm-smi from host
+      - /usr/bin/rocm-smi:/usr/bin/rocm-smi:ro
+      - /dev/dri:/dev/dri:ro
+      - /dev/kfd:/dev/kfd:ro
+    devices:
+      # Pass through GPU devices
+      - /dev/dri
+      - /dev/kfd
+    environment:
+      - ROCM_VISIBLE_DEVICES=0,1,2,3  # Adjust based on your GPUs
+    restart: unless-stopped
+    command: ["./rocm-monitor", "-interval", "5s", "-metrics"]

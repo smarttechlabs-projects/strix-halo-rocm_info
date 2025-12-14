@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>ROCm Monitor Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #eee;
+            --card-bg: #1e1e1e;
+            --border-color: #333;
+            --button-bg: #2196F3;
+            --button-hover: #1976D2;
+            --error-color: #f44336;
+            --success-color: #4CAF50;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #ffffff;
+            --text-color: #333;
+            --card-bg: #f5f5f5;
+            --border-color: #ddd;
+            --button-bg: #2196F3;
+            --button-hover: #1976D2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 1rem;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button, select {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--button-hover);
+        }
+
+        select {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .status {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+        }
+
+        .status-indicator.error {
+            background-color: var(--error-color);
+        }
+
+        .gpu-selector {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .gpu-selector label {
+            margin-right: 1rem;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .chart-container {
+            background-color: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            height: 300px;
+            border: 1px solid var(--border-color);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .chart-container:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        [data-theme="light"] .chart-container {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        [data-theme="light"] .chart-container:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .chart-container canvas {
+            height: 200px !important;
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            color: var(--text-color);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .chart-title {
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        .error-message {
+            background-color: var(--error-color);
+            color: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        /* ROCm Test Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 5% auto;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .close {
+            color: var(--text-color);
+            float: right;
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: var(--error-color);
+        }
+
+        .test-summary {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .test-summary.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .test-summary.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .test-summary.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f1aeb5;
+        }
+
+        [data-theme="dark"] .test-summary.success {
+            background-color: #1e3a2e;
+            color: #4caf50;
+            border-color: #2e5233;
+        }
+
+        [data-theme="dark"] .test-summary.warning {
+            background-color: #3d3319;
+            color: #ff9800;
+            border-color: #4d4016;
+        }
+
+        [data-theme="dark"] .test-summary.error {
+            background-color: #3c1e1e;
+            color: #f44336;
+            border-color: #4d2626;
+        }
+
+        .test-result {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .test-result-header {
+            padding: 0.75rem 1rem;
+            background-color: var(--card-bg);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .test-result-header:hover {
+            background-color: var(--border-color);
+        }
+
+        .test-result-body {
+            display: none;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .test-result.expanded .test-result-body {
+            display: block;
+        }
+
+        .test-command {
+            font-family: monospace;
+            background-color: var(--card-bg);
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .test-output {
+            font-family: monospace;
+            background-color: var(--bg-color);
+            padding: 1rem;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .test-issues {
+            margin-top: 1rem;
+        }
+
+        .test-issue {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+
+        [data-theme="dark"] .test-issue {
+            background-color: #3d3319;
+            color: #ff9800;
+            border-color: #ff9800;
+        }
+
+        .loading-spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--button-bg);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .test-running {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-color);
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .modal-content {
+                margin: 2% auto;
+                width: 95%;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ROCm Monitor Dashboard</h1>
+            <div class="controls">
+                <button onclick="testROCm()">🔧 Test ROCm</button>
+                <button onclick="exportData('csv')">📥 Export CSV</button>
+                <button onclick="exportData('json')">📥 Export JSON</button>
+                <label for="interval">Interval:</label>
+                <select id="interval" onchange="changeInterval()">
+                    <option value="1" selected>1s</option>
+                    <option value="5">5s</option>
+                    <option value="10">10s</option>
+                    <option value="30">30s</option>
+                    <option value="60">60s</option>
+                </select>
+                <label for="timeWindow">Window:</label>
+                <select id="timeWindow" onchange="changeTimeWindow()">
+                    <option value="5m" selected>5 min</option>
+                    <option value="15m">15 min</option>
+                    <option value="30m">30 min</option>
+                    <option value="1h">1 hour</option>
+                    <option value="all">All</option>
+                </select>
+                <button onclick="toggleTheme()">🌓 Theme</button>
+            </div>
+        </header>
+
+        <div class="status">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span id="statusText">Connecting...</span>
+            <span id="gpuCount"></span>
+        </div>
+
+        <div class="gpu-info" id="gpuInfoPanel" style="display: none;">
+            <div style="background-color: var(--card-bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <h3 style="margin-bottom: 0.5rem;">GPU Information</h3>
+                <div id="gpuInfoContent"></div>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="gpu-selector" id="gpuSelector">
+            <label>Select GPUs:</label>
+            <label><input type="checkbox" id="gpuAll" checked onchange="toggleAllGPUs()"> All</label>
+            <span id="gpuCheckboxes"></span>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">Temperature (°C)</div>
+                <canvas id="tempChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">Power Consumption (W)</div>
+                <canvas id="powerChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">GPU Usage (%)</div>
+                <canvas id="gpuChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">CPU Usage (%)</div>
+                <canvas id="cpuChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title" id="clockChartTitle">GPU Clock Frequencies (MHz)</div>
+                <canvas id="clockChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title" id="vramChartTitle">VRAM Usage (GB)</div>
+                <canvas id="vramChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROCm Test Modal -->
+    <div id="rocmTestModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">ROCm System Test</div>
+                <span class="close" onclick="closeTestModal()">&times;</span>
+            </div>
+            <div id="testResults">
+                <!-- Test results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let interval = 1000;
+        let timeWindow = '5m';
+        let charts = {};
+        let selectedGPUs = new Set();
+        let allData = [];
+        let fetchTimer = null;
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        // Color palette for multiple GPUs
+        const colors = [
+            '#f44336', '#2196F3', '#4CAF50', '#FF9800', 
+            '#9C27B0', '#00BCD4', '#CDDC39', '#795548'
+        ];
+
+        // Get chart colors based on current theme
+        function getChartColors() {
+            const isDark = document.documentElement.dataset.theme === 'dark';
+            return {
+                textColor: isDark ? '#e0e0e0' : '#333333',
+                gridColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+            };
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const colors = getChartColors();
+            
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0 // Disable animations for real-time feel
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: colors.textColor,
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: colors.textColor === '#e0e0e0' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                        titleColor: colors.textColor === '#e0e0e0' ? '#ffffff' : '#000000',
+                        bodyColor: colors.textColor === '#e0e0e0' ? '#ffffff' : '#000000',
+                        borderColor: colors.gridColor,
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'category',
+                        display: true,
+                        border: {
+                            color: colors.borderColor
+                        },
+                        grid: {
+                            color: colors.gridColor,
+                            lineWidth: 1
+                        },
+                        ticks: {
+                            color: colors.textColor,
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            },
+                            maxRotation: 45,
+                            minRotation: 45,
+                            maxTicksLimit: 20  // Limit x-axis labels
+                        }
+                    },
+                    y: {
+                        display: true,
+                        border: {
+                            color: colors.borderColor
+                        },
+                        grid: {
+                            color: colors.gridColor,
+                            lineWidth: 1
+                        },
+                        ticks: {
+                            color: colors.textColor,
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            }
+                        },
+                        beginAtZero: true
+                    }
+                }
+            };
+
+            charts.temp = new Chart(document.getElementById('tempChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, max: 100 } } }
+            });
+
+            charts.power = new Chart(document.getElementById('powerChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: chartOptions
+            });
+
+            charts.gpu = new Chart(document.getElementById('gpuChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, max: 100 } } }
+            });
+
+            charts.cpu = new Chart(document.getElementById('cpuChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, max: 100 } } }
+            });
+
+            charts.clock = new Chart(document.getElementById('clockChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: chartOptions
+            });
+
+            const vramChartOptions = { 
+                ...chartOptions,
+                plugins: {
+                    ...chartOptions.plugins,
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            afterLabel: function(context) {
+                                // Get the corresponding GPU data to show total VRAM
+                                const dataIndex = context.dataIndex;
+                                const datasetIndex = context.datasetIndex;
+                                if (allData && allData.length > dataIndex) {
+                                    const snapshot = allData.slice(-MAX_DATA_POINTS)[dataIndex];
+                                    if (snapshot && snapshot.gpus && snapshot.gpus[datasetIndex]) {
+                                        const gpu = snapshot.gpus[datasetIndex];
+                                        return `Total: ${gpu.vram_total ? gpu.vram_total.toFixed(1) : 'N/A'}GB`;
+                                    }
+                                }
+                                return '';
+                            }
+                        }
+                    }
+                }
+            };
+
+            charts.vram = new Chart(document.getElementById('vramChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: vramChartOptions
+            });
+        }
+
+        async function fetchData() {
+            try {
+                const endpoint = timeWindow === 'all' ? '/api/stats' : `/api/stats?window=${timeWindow}`;
+                const response = await fetch(endpoint);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (Array.isArray(data) && data.length > 0) {
+                    allData = data;
+                    updateCharts(data);
+                    updateStatus(true);
+                    showError(null);
+                    retryCount = 0;
+                } else {
+                    throw new Error('No data available');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                updateStatus(false, error.message);
+                showError(`Failed to fetch data: ${error.message}`);
+                
+                // Retry logic
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(fetchData, 2000 * retryCount);
+                }
+            }
+        }
+
+        const MAX_DATA_POINTS = 50; // Maximum points to show on charts
+
+        function updateCharts(data) {
+            if (!data || data.length === 0) return;
+
+            // Get only the most recent data points
+            const recentData = data.slice(-MAX_DATA_POINTS);
+
+            // Detect GPUs and get max VRAM
+            const gpuIds = new Set();
+            let maxVRAM = 0;
+            recentData.forEach(snapshot => {
+                if (snapshot.gpus) {
+                    snapshot.gpus.forEach(gpu => {
+                        gpuIds.add(gpu.id);
+                        if (gpu.vram_total > maxVRAM) {
+                            maxVRAM = gpu.vram_total;
+                        }
+                    });
+                }
+            });
+
+            // Update GPU selector and VRAM chart title
+            updateGPUSelector(Array.from(gpuIds));
+            if (maxVRAM > 0) {
+                document.getElementById('vramChartTitle').textContent = `VRAM Usage (GB) - Max: ${maxVRAM.toFixed(0)}GB`;
+                // Update VRAM chart scale to match the actual max VRAM
+                charts.vram.options.scales.y.max = Math.ceil(maxVRAM);
+            }
+
+            // Prepare datasets for each GPU
+            const datasets = {
+                temp: [],
+                power: [],
+                gpu: [],
+                vram: []
+            };
+
+            // Prepare CPU dataset (single dataset for overall CPU usage)
+            const cpuDataset = {
+                label: 'CPU Usage',
+                data: [],
+                borderColor: '#FF6B35',
+                backgroundColor: '#FF6B3520',
+                tension: 0.1,
+                fill: false,
+                pointRadius: 2,
+                pointHoverRadius: 4
+            };
+
+            // Prepare clock frequency datasets
+            const clockDatasets = [];
+            gpuIds.forEach(gpuId => {
+                if (selectedGPUs.size === 0 || selectedGPUs.has(gpuId)) {
+                    const color = colors[gpuId % colors.length];
+                    
+                    clockDatasets.push({
+                        label: `GPU ${gpuId} SCLK`,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    });
+                    
+                    clockDatasets.push({
+                        label: `GPU ${gpuId} MCLK`,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderDash: [5, 5], // Dashed line for MCLK
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    });
+                }
+            });
+
+            gpuIds.forEach(gpuId => {
+                if (selectedGPUs.size === 0 || selectedGPUs.has(gpuId)) {
+                    const color = colors[gpuId % colors.length];
+                    
+                    datasets.temp.push({
+                        label: `GPU ${gpuId}`,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    });
+
+                    datasets.power.push({
+                        label: `GPU ${gpuId}`,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    });
+
+                    datasets.gpu.push({
+                        label: `GPU ${gpuId}`,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    });
+
+                    datasets.vram.push({
+                        label: `GPU ${gpuId}`,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    });
+                }
+            });
+
+            // Populate data with timestamps as labels
+            const labels = [];
+            recentData.forEach(snapshot => {
+                const timestamp = new Date(snapshot.timestamp);
+                labels.push(timestamp.toLocaleTimeString());
+
+                // Add CPU data
+                cpuDataset.data.push(snapshot.cpu_usage || 0);
+
+                snapshot.gpus.forEach(gpu => {
+                    if (selectedGPUs.size === 0 || selectedGPUs.has(gpu.id)) {
+                        const datasetIndex = Array.from(gpuIds).indexOf(gpu.id);
+                        if (datasetIndex >= 0 && datasetIndex < datasets.temp.length) {
+                            datasets.temp[datasetIndex].data.push(gpu.temperature);
+                            datasets.power[datasetIndex].data.push(gpu.power);
+                            datasets.gpu[datasetIndex].data.push(gpu.gpu_usage);
+                            datasets.vram[datasetIndex].data.push(gpu.vram_usage);
+                        }
+                        
+                        // Add clock frequency data
+                        const clockIndex = datasetIndex * 2; // Two datasets per GPU (SCLK, MCLK)
+                        if (clockIndex < clockDatasets.length) {
+                            clockDatasets[clockIndex].data.push(gpu.sclk_freq || 0); // SCLK
+                            if (clockIndex + 1 < clockDatasets.length) {
+                                clockDatasets[clockIndex + 1].data.push(gpu.mclk_freq || 0); // MCLK
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Update all charts with smooth transitions
+            charts.temp.data.labels = labels;
+            charts.temp.data.datasets = datasets.temp;
+            charts.temp.update('none');
+
+            charts.power.data.labels = labels;
+            charts.power.data.datasets = datasets.power;
+            charts.power.update('none');
+
+            charts.gpu.data.labels = labels;
+            charts.gpu.data.datasets = datasets.gpu;
+            charts.gpu.update('none');
+
+            charts.cpu.data.labels = labels;
+            charts.cpu.data.datasets = [cpuDataset];
+            charts.cpu.update('none');
+
+            charts.clock.data.labels = labels;
+            charts.clock.data.datasets = clockDatasets;
+            charts.clock.update('none');
+
+            charts.vram.data.labels = labels;
+            charts.vram.data.datasets = datasets.vram;
+            charts.vram.update('none');
+        }
+
+        function updateGPUSelector(gpuIds) {
+            const selector = document.getElementById('gpuSelector');
+            const checkboxContainer = document.getElementById('gpuCheckboxes');
+            
+            if (gpuIds.length > 1) {
+                selector.style.display = 'block';
+                checkboxContainer.innerHTML = gpuIds.map(id => 
+                    `<label><input type="checkbox" value="${id}" checked onchange="toggleGPU(${id})"> GPU ${id}</label>`
+                ).join(' ');
+                
+                // Initialize selected GPUs
+                if (selectedGPUs.size === 0) {
+                    gpuIds.forEach(id => selectedGPUs.add(id));
+                }
+            } else {
+                selector.style.display = 'none';
+            }
+
+            document.getElementById('gpuCount').textContent = `(${gpuIds.length} GPU${gpuIds.length > 1 ? 's' : ''} detected)`;
+        }
+
+        function toggleGPU(gpuId) {
+            if (selectedGPUs.has(gpuId)) {
+                selectedGPUs.delete(gpuId);
+            } else {
+                selectedGPUs.add(gpuId);
+            }
+            updateCharts(allData);
+        }
+
+        function toggleAllGPUs() {
+            const checkAll = document.getElementById('gpuAll').checked;
+            const checkboxes = document.querySelectorAll('#gpuCheckboxes input[type="checkbox"]');
+            
+            checkboxes.forEach(cb => {
+                cb.checked = checkAll;
+                const gpuId = parseInt(cb.value);
+                if (checkAll) {
+                    selectedGPUs.add(gpuId);
+                } else {
+                    selectedGPUs.delete(gpuId);
+                }
+            });
+            
+            updateCharts(allData);
+        }
+
+        function updateStatus(isConnected, message = '') {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            if (isConnected) {
+                indicator.classList.remove('error');
+                text.textContent = 'Connected';
+            } else {
+                indicator.classList.add('error');
+                text.textContent = message || 'Disconnected';
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            if (message) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            } else {
+                errorDiv.style.display = 'none';
+            }
+        }
+
+        async function exportData(format) {
+            try {
+                // Fetch the data
+                const response = await fetch(`/api/export.${format}`);
+                if (!response.ok) {
+                    throw new Error(`Export failed: ${response.status}`);
+                }
+                
+                // Get the blob
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `rocm_stats_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.${format}`;
+                link.style.display = 'none';
+                
+                // Download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                
+                console.log(`${format.toUpperCase()} export completed successfully`);
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert(`Export failed: ${error.message}`);
+            }
+        }
+
+        function changeInterval() {
+            interval = parseInt(document.getElementById('interval').value) * 1000;
+            
+            // Update backend interval
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: `${interval}ms` })
+            }).catch(error => console.error('Failed to update interval:', error));
+            
+            // Restart fetch timer
+            if (fetchTimer) clearInterval(fetchTimer);
+            fetchTimer = setInterval(fetchData, interval);
+        }
+
+        function changeTimeWindow() {
+            timeWindow = document.getElementById('timeWindow').value;
+            fetchData();
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const newTheme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+            html.dataset.theme = newTheme;
+            
+            // Update chart colors with new theme colors
+            const colors = getChartColors();
+            Object.values(charts).forEach(chart => {
+                // Update legend colors
+                chart.options.plugins.legend.labels.color = colors.textColor;
+                
+                // Update tooltip colors
+                chart.options.plugins.tooltip.backgroundColor = colors.textColor === '#e0e0e0' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)';
+                chart.options.plugins.tooltip.titleColor = colors.textColor === '#e0e0e0' ? '#ffffff' : '#000000';
+                chart.options.plugins.tooltip.bodyColor = colors.textColor === '#e0e0e0' ? '#ffffff' : '#000000';
+                chart.options.plugins.tooltip.borderColor = colors.gridColor;
+                
+                // Update axis colors
+                chart.options.scales.x.ticks.color = colors.textColor;
+                chart.options.scales.x.grid.color = colors.gridColor;
+                chart.options.scales.x.border.color = colors.borderColor;
+                
+                chart.options.scales.y.ticks.color = colors.textColor;
+                chart.options.scales.y.grid.color = colors.gridColor;
+                chart.options.scales.y.border.color = colors.borderColor;
+                
+                chart.update();
+            });
+        }
+
+        // Load GPU static information
+        async function loadGPUInfo() {
+            try {
+                const response = await fetch('/api/gpuinfo');
+                if (response.ok) {
+                    const gpuInfo = await response.json();
+                    displayGPUInfo(gpuInfo);
+                }
+            } catch (error) {
+                console.error('Failed to load GPU info:', error);
+            }
+        }
+
+        function displayGPUInfo(gpuInfoArray) {
+            if (gpuInfoArray.length === 0) return;
+            
+            const gpuInfo = gpuInfoArray[0]; // Show first GPU info
+            const panel = document.getElementById('gpuInfoPanel');
+            const content = document.getElementById('gpuInfoContent');
+            
+            let html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div><strong>Product:</strong> ${gpuInfo.product_name || 'Unknown'}</div>
+                    <div><strong>Vendor:</strong> ${gpuInfo.vendor_name}</div>
+                    <div><strong>Serial:</strong> ${gpuInfo.serial_number || 'Unknown'}</div>
+                    <div><strong>VRAM Vendor:</strong> ${gpuInfo.vram_vendor || 'Unknown'}</div>
+                    <div><strong>Bus Info:</strong> ${gpuInfo.bus_info || 'Unknown'}</div>
+                </div>
+            `;
+            
+            if (gpuInfo.firmware_info && Object.keys(gpuInfo.firmware_info).length > 0) {
+                html += '<div style="margin-top: 1rem;"><strong>Firmware Versions:</strong></div>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; font-size: 0.9em;">';
+                for (const [key, value] of Object.entries(gpuInfo.firmware_info)) {
+                    html += `<div>${key}: ${value}</div>`;
+                }
+                html += '</div>';
+            }
+            
+            content.innerHTML = html;
+            panel.style.display = 'block';
+        }
+
+        // ROCm Test Functions
+        async function testROCm() {
+            const modal = document.getElementById('rocmTestModal');
+            const resultsDiv = document.getElementById('testResults');
+            
+            // Show modal with loading state
+            modal.style.display = 'block';
+            resultsDiv.innerHTML = `
+                <div class="test-running">
+                    <div class="loading-spinner"></div>
+                    <h3>Running ROCm Tests...</h3>
+                    <p>This may take up to 30 seconds. Please wait.</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch('/api/rocm-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const testSuite = await response.json();
+                displayTestResults(testSuite);
+            } catch (error) {
+                console.error('ROCm test failed:', error);
+                resultsDiv.innerHTML = `
+                    <div class="test-summary error">
+                        ❌ Failed to run ROCm tests: ${error.message}
+                    </div>
+                    <p>Please ensure the ROCm Monitor server is running and accessible.</p>
+                `;
+            }
+        }
+
+        function displayTestResults(testSuite) {
+            const resultsDiv = document.getElementById('testResults');
+            
+            // Determine summary class
+            let summaryClass = 'success';
+            let hasWarnings = false;
+            
+            for (const result of testSuite.test_results) {
+                if (!result.success) {
+                    summaryClass = 'error';
+                    break;
+                } else if (result.issues && result.issues.length > 0) {
+                    hasWarnings = true;
+                }
+            }
+            
+            if (summaryClass === 'success' && hasWarnings) {
+                summaryClass = 'warning';
+            }
+            
+            let html = `
+                <div class="test-summary ${summaryClass}">
+                    ${testSuite.summary}
+                </div>
+            `;
+            
+            // Add individual test results
+            testSuite.test_results.forEach((result, index) => {
+                const hasIssues = result.issues && result.issues.length > 0;
+                const statusIcon = result.success ? '✅' : '❌';
+                const warningIcon = hasIssues ? ' ⚠️' : '';
+                
+                html += `
+                    <div class="test-result" id="test-${index}">
+                        <div class="test-result-header" onclick="toggleTestResult(${index})">
+                            <span>${statusIcon} ${result.summary}${warningIcon}</span>
+                            <span style="font-size: 0.875rem; color: var(--text-color); opacity: 0.7;">
+                                ${result.duration_ms}ms ▼
+                            </span>
+                        </div>
+                        <div class="test-result-body">
+                            <div class="test-command">
+                                <strong>Command:</strong> ${escapeHtml(result.command)}
+                            </div>
+                            
+                            ${hasIssues ? `
+                                <div class="test-issues">
+                                    <strong>Issues detected:</strong>
+                                    ${result.issues.map(issue => `<div class="test-issue">${escapeHtml(issue)}</div>`).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            <div>
+                                <strong>Output:</strong>
+                                <div class="test-output">${escapeHtml(result.output || 'No output')}</div>
+                            </div>
+                            
+                            ${result.error_output ? `
+                                <div>
+                                    <strong>Error:</strong>
+                                    <div class="test-output">${escapeHtml(result.error_output)}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function toggleTestResult(index) {
+            const testResult = document.getElementById(`test-${index}`);
+            if (testResult) {
+                testResult.classList.toggle('expanded');
+                
+                // Update arrow direction
+                const header = testResult.querySelector('.test-result-header span:last-child');
+                if (header) {
+                    header.textContent = header.textContent.replace('▼', '▲').replace('▲', testResult.classList.contains('expanded') ? '▲' : '▼');
+                }
+            }
+        }
+
+        function closeTestModal() {
+            document.getElementById('rocmTestModal').style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('rocmTestModal');
+            if (event.target === modal) {
+                closeTestModal();
+            }
+        }
+
+        // Initialize
+        initCharts();
+        loadGPUInfo();
+        fetchData();
+        fetchTimer = setInterval(fetchData, interval);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (fetchTimer) clearInterval(fetchTimer);
+        });
+    </script>
+</body>
+</html>

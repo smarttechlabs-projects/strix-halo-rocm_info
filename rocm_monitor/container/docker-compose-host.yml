@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: rocm-prometheus
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./prometheus-host.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=5GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--web.listen-address=0.0.0.0:9090'
+    depends_on:
+      - alertmanager
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: rocm-grafana
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_FEATURE_TOGGLES_ENABLE=publicDashboards
+      - GF_SERVER_HTTP_PORT=3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: rocm-alertmanager
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--web.listen-address=0.0.0.0:9093'
+      - '--cluster.advertise-address=127.0.0.1:9093'
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:

@@ -1,0 +1,118 @@
+groups:
+  - name: rocm_critical_alerts
+    rules:
+      - alert: GPUTemperatureCritical
+        expr: rocm_gpu_temperature_celsius > 85
+        for: 2m
+        labels:
+          severity: critical
+          component: hardware
+          service: rocm-monitor
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} temperature critically high"
+          description: "GPU {{ $labels.gpu_id }} ({{ $labels.product_name }}) temperature {{ $value }}°C exceeds safe operating limits"
+          runbook_url: "https://github.com/your-org/runbooks/gpu-temperature-critical"
+          
+      - alert: VRAMExhaustion
+        expr: rocm_gpu_vram_utilization_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+          component: memory
+          service: rocm-monitor
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} VRAM near exhaustion"
+          description: "GPU {{ $labels.gpu_id }} VRAM utilization {{ $value }}% may cause out-of-memory errors"
+          runbook_url: "https://github.com/your-org/runbooks/vram-exhaustion"
+
+      - alert: ROCmMonitorDown
+        expr: up{job="rocm-monitor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: monitoring
+          service: rocm-monitor
+        annotations:
+          summary: "ROCm Monitor is down"
+          description: "ROCm Monitor has been down for more than 1 minute"
+
+  - name: rocm_warning_alerts
+    rules:
+      - alert: GPUTemperatureWarning
+        expr: rocm_gpu_temperature_celsius > 75
+        for: 5m
+        labels:
+          severity: warning
+          component: hardware
+          service: rocm-monitor
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} running warm"
+          description: "GPU {{ $labels.gpu_id }} temperature {{ $value }}°C approaching thermal limits"
+          
+      - alert: VRAMHighUtilization  
+        expr: rocm_gpu_vram_utilization_percent > 80
+        for: 3m
+        labels:
+          severity: warning
+          component: memory
+          service: rocm-monitor
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} VRAM utilization high"
+          description: "GPU {{ $labels.gpu_id }} VRAM utilization {{ $value }}% may impact performance"
+          
+      - alert: ROCmCollectionErrors
+        expr: increase(rocm_monitor_collection_errors_total[10m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: monitoring
+          service: rocm-monitor
+        annotations:
+          summary: "ROCm data collection experiencing errors"
+          description: "{{ $value }} collection errors in the last 10 minutes"
+          
+      - alert: MonitorPerformanceDegraded
+        expr: rocm_monitor_collection_duration_ms > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+          service: rocm-monitor
+        annotations:
+          summary: "ROCm monitor collection performance degraded"
+          description: "Collection duration {{ $value }}ms exceeds normal range"
+
+      - alert: GPUClockFrequencyDrop
+        expr: rocm_gpu_sclk_mhz < 500
+        for: 3m
+        labels:
+          severity: warning
+          component: performance
+          service: rocm-monitor
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} clock frequency dropped"
+          description: "GPU {{ $labels.gpu_id }} SCLK frequency {{ $value }}MHz is unusually low"
+
+  - name: rocm_info_alerts
+    rules:
+      - alert: ROCmTestFailure
+        expr: rocm_test_suite_success == 0
+        for: 0s
+        labels:
+          severity: info
+          component: diagnostics
+          service: rocm-monitor
+        annotations:
+          summary: "ROCm diagnostic tests failed"
+          description: "ROCm system validation detected issues requiring attention"
+
+      - alert: GPUPowerConsumptionHigh
+        expr: rocm_gpu_power_watts > 50
+        for: 10m
+        labels:
+          severity: info
+          component: power
+          service: rocm-monitor
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} power consumption high"
+          description: "GPU {{ $labels.gpu_id }} power consumption {{ $value }}W sustained for 10+ minutes"

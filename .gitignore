@@ -1,0 +1,15 @@
+# Binaries
+rocm_monitor/rocm_monitor
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# Environment files
+.env
+
+# Claude local settings
+.claude/settings.local.json
