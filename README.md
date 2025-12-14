@@ -6,12 +6,11 @@ for related dashboards.
 
 ![rocm monitor main.png](rocm_monitor/content/rocm%20monitor%20main.png)
 
-The tool also check ROCm-related driver availability etc:
+The tool also checks ROCm-related driver availability:
 ![rocm monitor system test.png](rocm_monitor/content/rocm%20monitor%20system%20test.png)
 
-## Stack Components
-
-o check ROCm-related driver availability etc:
+The test also reveals details:
+![rocm monitor test detail.png](rocm_monitor/content/rocm%20monitor%20test%20detail.png)
 
 ## Features
 
@@ -22,6 +21,8 @@ o check ROCm-related driver availability etc:
 - ✅ Data export (CSV, JSON, Prometheus metrics)
 - ✅ Configurable monitoring intervals
 - ✅ Time-windowed data views (5min, 15min, 30min, 1h, all)
+- ✅ **Persistent settings** - Interval and window settings saved across browser sessions
+- ✅ **Client-side data filtering** - Change time windows without losing historical data
 - ✅ Dark/Light theme support
 - ✅ REST API for programmatic access
 - ✅ Graceful error handling and retry logic
@@ -152,7 +153,11 @@ The web interface provides real-time monitoring with professional charts and com
 - **📥 Export CSV** - Download monitoring data in CSV format
 - **📥 Export JSON** - Download monitoring data in JSON format
 - **Interval Selector** - Choose collection frequency (1s, 5s, 10s, 30s, 60s)
+  - Settings persist across browser sessions via localStorage
+  - Syncs with backend configuration on page load
 - **Time Window** - Select data range (5min, 15min, 30min, 1h, all)
+  - Client-side filtering preserves historical data when changing windows
+  - Settings persist across browser sessions
 - **🌓 Theme** - Toggle between dark and light themes
 
 #### Status Indicators
