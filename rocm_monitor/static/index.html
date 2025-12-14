@@ -507,17 +507,14 @@
                         break;
                     }
                 }
+                console.log(`Loaded saved interval: ${interval}ms`);
             }
 
             if (savedWindow) {
                 timeWindow = savedWindow;
                 const windowSelect = document.getElementById('timeWindow');
-                for (let option of windowSelect.options) {
-                    if (option.value === timeWindow) {
-                        option.selected = true;
-                        break;
-                    }
-                }
+                windowSelect.value = timeWindow;  // Direct value assignment
+                console.log(`Loaded saved time window: ${timeWindow}`);
             }
         }
 
@@ -1038,7 +1035,11 @@
         }
 
         function changeInterval() {
-            interval = parseInt(document.getElementById('interval').value) * 1000;
+            const intervalSelect = document.getElementById('interval');
+            interval = parseInt(intervalSelect.value) * 1000;
+
+            // Ensure dropdown shows selected value
+            intervalSelect.value = (interval / 1000).toString();
 
             // Save to localStorage
             localStorage.setItem('rocm_interval', interval.toString());
@@ -1053,23 +1054,41 @@
             // Restart fetch timer
             if (fetchTimer) clearInterval(fetchTimer);
             fetchTimer = setInterval(fetchData, interval);
+
+            console.log(`Interval changed to: ${interval}ms`);
         }
 
         function changeTimeWindow() {
-            timeWindow = document.getElementById('timeWindow').value;
+            const windowSelect = document.getElementById('timeWindow');
+            timeWindow = windowSelect.value;
+
+            // Ensure dropdown shows selected value
+            windowSelect.value = timeWindow;
 
             // Save to localStorage
             localStorage.setItem('rocm_timeWindow', timeWindow);
+
+            // Update status to show window change
+            const statusText = document.getElementById('statusText');
+            const originalText = statusText.textContent;
 
             // Filter existing data client-side if we have data
             if (fullData.length > 0) {
                 const filteredData = filterDataByWindow(fullData, timeWindow);
                 allData = filteredData;
                 updateCharts(filteredData);
+
+                // Show brief feedback
+                statusText.textContent = `Window: ${timeWindow} (${filteredData.length} points)`;
+                setTimeout(() => {
+                    statusText.textContent = originalText;
+                }, 2000);
             } else {
                 // No cached data, fetch from backend
                 fetchData();
             }
+
+            console.log(`Time window changed to: ${timeWindow}, data points: ${allData.length}`);
         }
 
         // Filter data by time window client-side
