@@ -743,13 +743,38 @@
             }
         }
 
-        const MAX_DATA_POINTS = 50; // Maximum points to show on charts
+        const MAX_DATA_POINTS = 100; // Maximum points to show on charts for performance
+
+        // Sample data evenly across the time window to maintain full coverage
+        function sampleData(data, maxPoints) {
+            if (!data || data.length <= maxPoints) {
+                return data;
+            }
+
+            // Calculate step size to evenly sample across the data
+            const step = data.length / maxPoints;
+            const sampled = [];
+
+            for (let i = 0; i < maxPoints; i++) {
+                const index = Math.floor(i * step);
+                if (index < data.length) {
+                    sampled.push(data[index]);
+                }
+            }
+
+            // Always include the most recent data point
+            if (sampled.length > 0 && sampled[sampled.length - 1] !== data[data.length - 1]) {
+                sampled[sampled.length - 1] = data[data.length - 1];
+            }
+
+            return sampled;
+        }
 
         function updateCharts(data) {
             if (!data || data.length === 0) return;
 
-            // Get only the most recent data points
-            const recentData = data.slice(-MAX_DATA_POINTS);
+            // Sample data evenly across the time window (not just last N points)
+            const recentData = sampleData(data, MAX_DATA_POINTS);
 
             // Detect GPUs and get max VRAM
             const gpuIds = new Set();
@@ -1078,17 +1103,26 @@
                 allData = filteredData;
                 updateCharts(filteredData);
 
+                // Calculate actual time range for feedback
+                let timeRange = '';
+                if (filteredData.length > 0) {
+                    const firstTime = new Date(filteredData[0].timestamp);
+                    const lastTime = new Date(filteredData[filteredData.length - 1].timestamp);
+                    timeRange = `${firstTime.toLocaleTimeString()} - ${lastTime.toLocaleTimeString()}`;
+                }
+
                 // Show brief feedback
-                statusText.textContent = `Window: ${timeWindow} (${filteredData.length} points)`;
+                statusText.textContent = `Window: ${timeWindow} (${filteredData.length} pts)`;
                 setTimeout(() => {
                     statusText.textContent = originalText;
                 }, 2000);
+
+                console.log(`Time window: ${timeWindow}, points: ${filteredData.length}, range: ${timeRange}`);
             } else {
                 // No cached data, fetch from backend
                 fetchData();
+                console.log(`Time window changed to: ${timeWindow}, fetching data...`);
             }
-
-            console.log(`Time window changed to: ${timeWindow}, data points: ${allData.length}`);
         }
 
         // Filter data by time window client-side
