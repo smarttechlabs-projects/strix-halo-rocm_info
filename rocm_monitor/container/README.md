@@ -2,11 +2,6 @@
 
 Complete monitoring stack with Prometheus, Grafana, and Alertmanager for ROCm GPU monitoring.
 
-![rocm monitor main.png](../content/rocm%20monitor%20main.png)
-
-The tool also check ROCm-related driver availability etc:
-![rocm monitor system test.png](../content/rocm%20monitor%20system%20test.png)
-
 ## Stack Components
 
 - **Prometheus** (port 9090) - Metrics collection and alerting

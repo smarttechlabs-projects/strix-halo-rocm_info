@@ -4,6 +4,15 @@ A real-time GPU monitoring tool for AMD GPUs using ROCm, with a web-based dashbo
 visualization and data export. Providing /metrics endpoint for Prometheus and Grafana
 for related dashboards.
 
+![rocm monitor main.png](rocm_monitor/content/rocm%20monitor%20main.png)
+
+The tool also check ROCm-related driver availability etc:
+![rocm monitor system test.png](rocm_monitor/content/rocm%20monitor%20system%20test.png)
+
+## Stack Components
+
+o check ROCm-related driver availability etc:
+
 ## Features
 
 - ✅ Real-time GPU monitoring (temperature, power, usage, VRAM)
